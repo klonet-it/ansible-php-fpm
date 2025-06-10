@@ -1,0 +1,62 @@
+---
+- name: Install PHP 8.2 and FPM + modules
+  hosts: all
+  become: true
+  vars:
+    php_version: "8.2"
+  tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+
+    - name: Define package list (from inventory)
+      ansible.builtin.set_fact:
+        php_packages_final: "{{ php_packages | map('regex_replace', '^', php_package_prefix) | list }}"
+
+    - name: Install PHP on Debian-based systems
+      when: ansible_facts['os_family'] == "Debian"
+      block:
+        - name: Add PHP repository
+          ansible.builtin.apt_repository:
+            repo: ppa:ondrej/php
+            state: present
+            update_cache: yes
+
+        - name: Install PHP packages (Debian)
+          ansible.builtin.apt:
+            name: "{{ php_packages_final + ['php' + php_version + '-fpm'] }}"
+            state: present
+            update_cache: yes
+
+    - name: Install PHP on RedHat-based systems
+      when: ansible_facts['os_family'] == "RedHat"
+      block:
+        - name: Enable EPEL and Remi repo
+          ansible.builtin.yum:
+            name:
+              - epel-release
+              - https://rpms.remirepo.net/enterprise/remi-release-{{ ansible_facts['distribution_major_version'] }}.rpm
+            state: present
+
+        - name: Enable Remi PHP 8.2 module
+          ansible.builtin.command: dnf module enable php:remi-8.2 -y
+          when: ansible_facts['distribution_major_version'] | int >= 8
+
+        - name: Install PHP packages (RedHat)
+          ansible.builtin.yum:
+            name: "{{ php_packages_final + ['php-fpm'] }}"
+            state: present
+
+    - name: Ensure PHP-FPM is started and enabled
+      ansible.builtin.service:
+        name: php{{ php_version }}-fpm
+        state: started
+        enabled: yes
+      when: ansible_facts['os_family'] == "Debian"
+
+    - name: Ensure PHP-FPM is started and enabled (RedHat fallback)
+      ansible.builtin.service:
+        name: php-fpm
+        state: started
+        enabled: yes
+      when: ansible_facts['os_family'] == "RedHat"
+
