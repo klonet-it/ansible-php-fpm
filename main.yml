@@ -4,6 +4,12 @@
   become: true
   vars:
     php_version: "8.2"
+
+
+  handlers:
+     - name: Reload systemd and restart php-fpm
+       ansible.builtin.shell: systemctl daemon-reexec && systemctl restart php{{ php_version }}-fpm
+
   tasks:
     - name: Gather facts
       ansible.builtin.setup:
@@ -45,6 +51,20 @@
           ansible.builtin.yum:
             name: "{{ php_packages_final + ['php-fpm'] }}"
             state: present
+
+	
+    - name: Create systemd override for PHP-FPM
+      ansible.builtin.copy:
+	dest: "/etc/systemd/system/php{{ php_version }}-fpm.service.d/override.conf"
+	content: "{{ lookup('template', 'templates/php-fpm-override.conf.j2') }}"
+	mode: "0644"
+      notify: Reload systemd and restart php-fpm
+
+    - name: Ensure override directory exists
+      ansible.builtin.file:
+	path: "/etc/systemd/system/php{{ php_version }}-fpm.service.d"
+	state: directory
+
 
     - name: Ensure PHP-FPM is started and enabled
       ansible.builtin.service:

@@ -1,0 +1,27 @@
+---
+- name: Configure PHP-FPM pools
+  hosts: all
+  become: true
+  vars:
+    pools_dir: "/etc/php/{{ php_version }}/fpm/pool.d"
+  tasks:
+    - name: Create pool directory
+      ansible.builtin.file:
+        path: "{{ pools_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Deploy PHP-FPM pools
+      ansible.builtin.template:
+        src: "templates/php-pool.j2"
+        dest: "{{ pools_dir }}/{{ item.name }}.conf"
+        mode: "0644"
+      with_items: "{{ php_pools }}"
+      notify: Restart php-fpm
+
+  handlers:
+    - name: Restart php-fpm
+      ansible.builtin.service:
+        name: php{{ php_version }}-fpm
+        state: restarted
+
