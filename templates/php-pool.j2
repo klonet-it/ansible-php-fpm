@@ -12,8 +12,8 @@ pm.max_spare_servers = {{ item.pm_max_spare_servers }}
 
 chdir = /
 
-listen.owner = www-data
-listen.group = www-data
+listen.owner = {{ item.user }}
+listen.group = {{ item.group }}
 listen.mode = 0660
 
 ping.path = /ping
